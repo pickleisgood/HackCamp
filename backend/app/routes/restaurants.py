@@ -111,9 +111,9 @@ async def search_restaurants(request: SearchRequest) -> SearchResponse:
                     rating=float(restaurant.get('rating', 0)),
                     budget=restaurant.get('budget', ''),
                     cuisines=restaurant.get('cuisines', []),
-                    image=restaurant_image,  # Always set an image
-                    website=restaurant.get('website'),
-                    menuLink=restaurant.get('menuLink'),
+                    image=restaurant_image,
+                    website=restaurant.get('website') or restaurant.get('website_url'),
+                    menuLink=restaurant.get('menuLink') or restaurant.get('menu_url'),
                     matchingItems=restaurant.get('matching_menu_items', restaurant.get('matchingItems', [])),
                     phone=restaurant.get('phone', ''),
                     hours=restaurant.get('hours', ''),
@@ -123,7 +123,7 @@ async def search_restaurants(request: SearchRequest) -> SearchResponse:
                     matchScore=restaurant.get('match_score'),
                     whyItMatches=restaurant.get('why_it_matches'),
                 )
-                print(f"✅ Restaurant {restaurant_name} - Image: {restaurant_image}")
+                print(f"✅ Restaurant {restaurant_name}")
                 restaurants_data.append(restaurant_obj)
             except Exception as e:
                 print(f"⚠️ Error parsing restaurant data: {str(e)}")

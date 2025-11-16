@@ -4,26 +4,40 @@ import '../styles/MapContainer.css';
 function MapContainer({ restaurants, center = { lat: 40.7128, lng: -74.0060 } }) {
   const mapRef = React.useRef(null);
   const [map, setMap] = React.useState(null);
+  const [mapError, setMapError] = React.useState(false);
   const markersRef = React.useRef([]);
 
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // Initialize map
-    const googleMap = new window.google.maps.Map(mapRef.current, {
-      zoom: 13,
-      center: {
-        lat: (center && center.lat) || 40.7128,
-        lng: (center && center.lng) || -74.0060
-      },
-      mapTypeId: window.google.maps.MapTypeId.ROADMAP
-    });
+    // Check if Google Maps API is loaded
+    if (!window.google || !window.google.maps) {
+      console.warn('⚠️ Google Maps API not available - displaying fallback');
+      setMapError(true);
+      return;
+    }
 
-    setMap(googleMap);
+    try {
+      // Initialize map
+      const googleMap = new window.google.maps.Map(mapRef.current, {
+        zoom: 13,
+        center: {
+          lat: (center && center.lat) || 40.7128,
+          lng: (center && center.lng) || -74.0060
+        },
+        mapTypeId: window.google.maps.MapTypeId.ROADMAP
+      });
+
+      setMap(googleMap);
+      setMapError(false);
+    } catch (error) {
+      console.error('❌ Failed to initialize Google Maps:', error);
+      setMapError(true);
+    }
   }, [center?.lat, center?.lng]);
 
   useEffect(() => {
-    if (!map) return;
+    if (!map || mapError) return;
 
     console.log(`📍 Map updating with ${restaurants.length} restaurants`);
 
@@ -78,15 +92,24 @@ function MapContainer({ restaurants, center = { lat: 40.7128, lng: -74.0060 } })
       });
       map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
     }
-  }, [map, restaurants]);
+  }, [map, restaurants, mapError]);
 
   return (
     <div className="map-container">
-      <div ref={mapRef} className="map-inner" style={{ width: '100%', height: '100%' }} />
-      {restaurants.length === 0 && (
+      {mapError ? (
         <div className="map-placeholder">
-          <p>Search for restaurants to see them on the map</p>
+          <p>📍 Map unavailable - Please verify your Google Maps API key</p>
+          <p style={{ fontSize: '12px', color: '#888' }}>Restaurants are displayed in the list below</p>
         </div>
+      ) : (
+        <>
+          <div ref={mapRef} className="map-inner" style={{ width: '100%', height: '100%' }} />
+          {restaurants.length === 0 && (
+            <div className="map-placeholder">
+              <p>Search for restaurants to see them on the map</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

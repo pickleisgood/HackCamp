@@ -154,3 +154,26 @@
 .website-link:hover {
   background-color: #5568d3;
 }
+
+.card-links {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.link-info {
+  margin: 6px 0;
+  font-size: 0.85rem;
+  color: #555;
+  word-break: break-all;
+}
+
+.link-info a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.link-info a:hover {
+  text-decoration: underline;
+}

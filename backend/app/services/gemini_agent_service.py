@@ -8,6 +8,9 @@ from app.services.google_maps_service import GoogleMapsService
 import requests
 
 # Configure Gemini API
+if not settings.GEMINI_API_KEY:
+    raise ValueError("❌ GEMINI_API_KEY is not set in environment variables!")
+
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class WebScraperAgent:
@@ -235,7 +238,7 @@ Return ONLY a valid JSON array with no markdown:
                         
                         # CRITICAL: Only use real restaurant images - NO generic fallbacks
                         if not result.get('image') or not result['image'].startswith('http'):
-                            print(f"  ❌ WARNING: No real restaurant image found for {restaurant_name} - image will be missing")
+                            print(f"  ⚠️  No real restaurant image found for {restaurant_name} - image will be missing")
                             # Don't set a generic fallback - let it be None so frontend can handle it
                             result['image'] = None
                     else:

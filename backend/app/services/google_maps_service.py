@@ -169,7 +169,8 @@ class GoogleMapsService:
                 'Accept-Language': 'en-US,en;q=0.5',
             }
             
-            response = requests.get(website_url, headers=headers, timeout=10, allow_redirects=True)
+            # Use shorter timeout to avoid hanging
+            response = requests.get(website_url, headers=headers, timeout=5, allow_redirects=True)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.content, 'html.parser')
                 
@@ -196,7 +197,7 @@ class GoogleMapsService:
                             return img_url
                 
                 # Priority 3: Find images in the page, prioritizing large/hero images
-                images = soup.find_all('img', src=True)
+                images = soup.find_all('img', src=True, limit=10)  # Limit to first 10 images
                 candidate_images = []
                 
                 for img in images:
@@ -243,11 +244,11 @@ class GoogleMapsService:
                     return candidate_images[0][1]
                 
         except requests.exceptions.Timeout:
-            print(f"Timeout scraping image from website {website_url}")
+            print(f"⏱️  Timeout fetching image from website (took too long)")
         except requests.exceptions.RequestException as e:
-            print(f"Request error scraping image from website {website_url}: {e}")
+            print(f"🌐 Request error fetching image from website: {type(e).__name__}")
         except Exception as e:
-            print(f"Error scraping image from website {website_url}: {e}")
+            print(f"⚠️  Error fetching image from website: {type(e).__name__}")
         
         return None
     

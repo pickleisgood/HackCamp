@@ -39,9 +39,9 @@ function RestaurantCard({ restaurant, style }) {
   // Log image URL for debugging
   useEffect(() => {
     if (restaurant.image && imageSrc) {
-      console.log(`✅ Restaurant: ${restaurant.name}, REAL Image URL: ${restaurant.image}`);
-    } else {
-      console.warn(`⚠️ Restaurant: ${restaurant.name} has no REAL restaurant image available`);
+      console.log(`✅ Restaurant: ${restaurant.name}, Image URL: ${restaurant.image}`);
+    } else if (!restaurant.image) {
+      console.warn(`⚠️ Restaurant: ${restaurant.name} has no image available (will show placeholder)`);
     }
   }, [restaurant.name, restaurant.image, imageSrc]);
 
@@ -92,15 +92,30 @@ function RestaurantCard({ restaurant, style }) {
         <div className="card-actions">
           {restaurant.menuLink && (
             <a href={restaurant.menuLink} target="_blank" rel="noopener noreferrer" className="menu-link">
-              View Full Menu
+              📋 View Full Menu
             </a>
           )}
           {restaurant.website && (
             <a href={restaurant.website} target="_blank" rel="noopener noreferrer" className="website-link">
-              Visit Website
+              🌐 Visit Website
             </a>
           )}
         </div>
+
+        {(restaurant.website || restaurant.menuLink) && (
+          <div className="card-links">
+            {restaurant.website && (
+              <p className="link-info">
+                Website: <a href={restaurant.website} target="_blank" rel="noopener noreferrer">{restaurant.website}</a>
+              </p>
+            )}
+            {restaurant.menuLink && (
+              <p className="link-info">
+                Menu: <a href={restaurant.menuLink} target="_blank" rel="noopener noreferrer">{restaurant.menuLink}</a>
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
