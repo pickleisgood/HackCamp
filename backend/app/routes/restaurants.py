@@ -57,22 +57,25 @@ async def search_restaurants(request: SearchRequest) -> SearchResponse:
         for restaurant in ai_response.get('restaurants', []):
             try:
                 restaurant_obj = RestaurantResponse(
-                    id=restaurant.get('name', '').replace(' ', '_').lower(),
+                    id=restaurant.get('id', restaurant.get('name', '').replace(' ', '_').lower()),
                     name=restaurant.get('name', 'Unknown'),
                     address=restaurant.get('address', ''),
-                    latitude=restaurant.get('latitude', 0),
-                    longitude=restaurant.get('longitude', 0),
+                    latitude=float(restaurant.get('latitude', 0)),
+                    longitude=float(restaurant.get('longitude', 0)),
                     rating=float(restaurant.get('rating', 0)),
                     budget=restaurant.get('budget', ''),
                     cuisines=restaurant.get('cuisines', []),
                     image=restaurant.get('image'),
                     website=restaurant.get('website'),
                     menuLink=restaurant.get('menuLink'),
-                    matchingItems=restaurant.get('matchingItems', []),
-                    phone=restaurant.get('phone'),
-                    hours=restaurant.get('hours'),
-                    accessibility=restaurant.get('accessibility', []),
-                    serviceTypes=restaurant.get('serviceTypes', [])
+                    matchingItems=restaurant.get('matching_menu_items', restaurant.get('matchingItems', [])),
+                    phone=restaurant.get('phone', ''),
+                    hours=restaurant.get('hours', ''),
+                    accessibility=restaurant.get('accessibility_features', restaurant.get('accessibility', [])),
+                    serviceTypes=restaurant.get('service_types', restaurant.get('serviceTypes', [])),
+                    tags=restaurant.get('tags', []),
+                    matchScore=restaurant.get('match_score'),
+                    whyItMatches=restaurant.get('why_it_matches'),
                 )
                 restaurants_data.append(restaurant_obj)
             except Exception as e:

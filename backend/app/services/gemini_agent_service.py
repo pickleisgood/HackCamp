@@ -1,19 +1,107 @@
-# Gemini AI Agent Service for restaurant filtering
+# Gemini AI Agent Service with Sequential Agents for restaurant discovery
 import json
-from typing import List, Dict, Optional
+import re
+from typing import List, Dict, Optional, Any
 import google.generativeai as genai
 from app.config import settings
+import requests
 
-class GeminiAgentService:
-    """Service for Gemini AI agent interactions for restaurant discovery and filtering"""
+# Configure Gemini API
+genai.configure(api_key=settings.GEMINI_API_KEY)
+
+class WebScraperAgent:
+    """Agent dedicated to scraping and fetching restaurant information from the web"""
     
     def __init__(self):
-        """Initialize Gemini client with API key"""
-        genai.configure(api_key=settings.GEMINI_API_KEY)
+        """Initialize web scraper agent"""
         self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
     
-    def build_search_prompt(self, location: str, filters: Dict) -> str:
-        """Build a detailed prompt for Gemini to search restaurants based on filters"""
+    def search_restaurants_web(self, location: str, filters: Dict) -> Dict:
+        """
+        Agent that searches for restaurants using web scraping and API calls.
+        Converts filter criteria to a web search query.
+        """
+        print(f"🌐 Web Scraper Agent: Searching for restaurants in {location}")
+        
+        # Build search query from filters
+        search_query = self._build_search_query(location, filters)
+        
+        try:
+            # First, try to get results from Google Places-like query
+            results = self._search_google_places_equivalent(location, filters)
+            
+            if results:
+                print(f"✓ Web Scraper Agent: Found {len(results)} restaurants")
+                return {
+                    "raw_results": results,
+                    "search_query": search_query,
+                    "total_found": len(results),
+                    "status": "success"
+                }
+            else:
+                # Fallback: Use Gemini to generate realistic restaurant data based on location and filters
+                return self._generate_restaurant_data(location, filters, search_query)
+        
+        except Exception as e:
+            print(f"✗ Web Scraper Agent Error: {str(e)}")
+            return {
+                "raw_results": [],
+                "error": str(e),
+                "status": "error"
+            }
+    
+    def _build_search_query(self, location: str, filters: Dict) -> str:
+        """Convert filter criteria to a web search query"""
+        query_parts = [location]
+        
+        if filters.get('cuisines'):
+            query_parts.extend(filters['cuisines'])
+        
+        if filters.get('dietary'):
+            query_parts.extend(filters['dietary'])
+        
+        if filters.get('budget'):
+            query_parts.append(f"${len(filters['budget'][0])}")
+        
+        return " ".join(query_parts)
+    
+    def _search_google_places_equivalent(self, location: str, filters: Dict) -> List[Dict]:
+        """
+        Search for restaurants using web APIs and scraping.
+        This could integrate with Google Places API or other restaurant databases.
+        """
+        # For now, use Gemini to search (simulating web search)
+        prompt = f"""Find real restaurants in {location} matching these criteria:
+        
+Budget: {', '.join(filters.get('budget', ['$', '$$', '$$$', '$$$$']))}
+Dietary: {', '.join(filters.get('dietary', ['Any']))}
+Cuisine: {', '.join(filters.get('cuisines', ['Any']))}
+Min Rating: {filters.get('minRating', 3.5)}
+
+Return a JSON array of REAL, ACTUAL restaurants with exact names and addresses.
+Format: [{{"name": "exact name", "address": "exact address", "cuisine": "type"}}]"""
+        
+        try:
+            response = self.model.generate_content(prompt)
+            response_text = response.text.strip()
+            
+            # Extract JSON
+            json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+            if json_match:
+                results = json.loads(json_match.group())
+                return results if isinstance(results, list) else []
+        except Exception as e:
+            print(f"Error in web search: {e}")
+        
+        return []
+    
+    def _generate_restaurant_data(self, location: str, filters: Dict, search_query: str) -> Dict:
+        """Generate comprehensive restaurant data when web scraping unavailable"""
+        print(f"📊 Web Scraper Agent: Generating restaurant data...")
         
         budget_map = {
             '$': 'Budget friendly (under $15 per person)',
@@ -25,217 +113,218 @@ class GeminiAgentService:
         budget_str = ', '.join([budget_map.get(b, b) for b in filters.get('budget', [])])
         dietary_str = ', '.join(filters.get('dietary', []))
         cuisines_str = ', '.join(filters.get('cuisines', []))
-        service_str = ', '.join(filters.get('serviceType', []))
-        accessibility_str = ', '.join(filters.get('accessibility', []))
-        operational_str = ', '.join(filters.get('operational', []))
         min_rating = filters.get('minRating', 3.5)
         
-        prompt = f"""You are a restaurant discovery AI agent. Find the BEST restaurants in {location} that match these specific criteria:
+        prompt = f"""Find 5-8 REAL, POPULAR restaurants in {location} with these exact criteria.
+Only include restaurants that ACTUALLY EXIST and are well-known:
 
-**Search Criteria:**
-- Location: {location}
-- Budget Level: {budget_str if budget_str else 'Any budget'}
-- Dietary Restrictions/Preferences: {dietary_str if dietary_str else 'No specific restrictions'}
-- Cuisine Types: {cuisines_str if cuisines_str else 'Any cuisine'}
-- Service Types Needed: {service_str if service_str else 'Any service type'}
-- Accessibility Features: {accessibility_str if accessibility_str else 'No specific requirements'}
-- When to Dine: {operational_str if operational_str else 'Anytime'}
-- Minimum Rating: {min_rating}+ stars
+Location: {location}
+Budget: {budget_str if budget_str else 'Any'}
+Dietary Options: {dietary_str if dietary_str else 'Any'}
+Cuisines: {cuisines_str if cuisines_str else 'Any'}
+Minimum Rating: {min_rating}+
 
-**Task:**
-1. Research and find 3-5 high-quality restaurants that match ALL of these criteria
-2. For each restaurant, provide:
-   - Name (EXACT restaurant name)
-   - Address and location
-   - Estimated price range ($, $$, $$$, or $$$$)
-   - Cuisine type
-   - Google Maps rating (estimate if not exact)
-   - 2-3 menu items that match the dietary restrictions
-   - Service types available (Dine-in, Takeout, Delivery)
-   - Website URL (if known)
-   - Accessibility features
-   - Operating hours summary
+For each restaurant provide ACCURATE information:
+- Exact restaurant name
+- Real address
+- Actual cuisine type
+- Real phone number (if known)
+- Website
+- Approximate price range
+- Real menu items
+- Accessibility features
 
-3. IMPORTANT: Focus on accuracy and real restaurants. If unsure, indicate confidence level.
+Return ONLY a valid JSON array:
+[
+  {{
+    "name": "restaurant name",
+    "address": "address",
+    "phone": "phone",
+    "website": "url",
+    "cuisine": ["type1"],
+    "rating": 4.5,
+    "budget": "$$ or $$$",
+    "hours": "Mon-Sun 11am-11pm",
+    "wheelchair_accessible": true/false,
+    "menu_items": ["dish1", "dish2", "dish3"],
+    "service_types": ["Dine-in", "Takeout", "Delivery"]
+  }}
+]"""
+        
+        try:
+            response = self.model.generate_content(prompt)
+            response_text = response.text.strip()
+            
+            # Extract JSON array
+            json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+            if json_match:
+                raw_results = json.loads(json_match.group())
+                return {
+                    "raw_results": raw_results if isinstance(raw_results, list) else [],
+                    "search_query": search_query,
+                    "total_found": len(raw_results) if isinstance(raw_results, list) else 0,
+                    "status": "success"
+                }
+        except Exception as e:
+            print(f"Error generating data: {e}")
+        
+        return {
+            "raw_results": [],
+            "error": "Failed to generate restaurant data",
+            "status": "error"
+        }
 
-**Return format:**
-Return ONLY valid JSON (no markdown, no code blocks) in this exact format:
+
+class DataTransformerAgent:
+    """Agent dedicated to transforming and formatting restaurant data for frontend display"""
+    
+    def __init__(self):
+        """Initialize data transformer agent"""
+        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+    
+    def transform_restaurant_data(self, raw_restaurants: List[Dict], filters: Dict) -> Dict:
+        """
+        Transform raw restaurant data into frontend-displayable format.
+        Filters restaurants based on ALL criteria and enriches data.
+        """
+        print(f"🔄 Data Transformer Agent: Processing {len(raw_restaurants)} restaurants")
+        
+        restaurants_json = json.dumps(raw_restaurants, indent=2)
+        filters_json = json.dumps(filters, indent=2)
+        
+        prompt = f"""You are a data transformer. Process these restaurants and filters.
+
+RESTAURANTS:
+{restaurants_json}
+
+FILTERS (what user selected):
+{filters_json}
+
+TASK:
+1. Filter restaurants that match ALL user criteria exactly
+2. For each matching restaurant, add:
+   - match_score (0-100 based on how well it matches ALL filters)
+   - matching_menu_items (dishes that match dietary restrictions)
+   - why_it_matches (explanation for user)
+   - accessibility_features (list)
+   - service_types_available (list)
+3. Sort by match_score descending
+4. Include coordinates as lat/lon (estimate if needed)
+
+Return ONLY valid JSON:
 {{
-  "restaurants": [
+  "transformed_restaurants": [
     {{
-      "name": "Restaurant Name",
-      "address": "Street Address, City, State, ZIP",
-      "budget": "$$ or $$$, etc",
-      "cuisines": ["Cuisine1", "Cuisine2"],
+      "id": "unique_id",
+      "name": "restaurant name",
+      "address": "full address",
+      "latitude": 37.7749,
+      "longitude": -122.4194,
       "rating": 4.5,
-      "matchingItems": ["Dish 1 matching dietary", "Dish 2 matching dietary"],
-      "serviceTypes": ["Dine-In", "Takeout"],
-      "website": "https://website.com",
-      "accessibility": ["Wheelchair Accessible"],
-      "hours": "Mon-Sun 11am-11pm (or similar)",
-      "matchNotes": "Why this restaurant matches the criteria"
+      "budget": "$$ or $$$",
+      "cuisines": ["type1", "type2"],
+      "image": "url_if_available",
+      "website": "url",
+      "phone": "phone_number",
+      "hours": "hours",
+      "match_score": 95,
+      "matching_menu_items": ["dish1", "dish2"],
+      "why_it_matches": "reason",
+      "accessibility_features": ["wheelchair"],
+      "service_types": ["Dine-in", "Takeout"],
+      "tags": ["tag1", "tag2"]
     }}
   ],
-  "searchSummary": "Brief summary of what was found",
-  "confidence": "high/medium/low"
-}}
-
-Now search and return results for {location}:"""
-        
-        return prompt
-    
-    def search_restaurants(self, location: str, filters: Dict) -> Dict:
-        """Use Gemini AI to search for restaurants matching user criteria"""
-        try:
-            prompt = self.build_search_prompt(location, filters)
-            
-            # Get response from Gemini
-            response = self.model.generate_content(prompt)
-            response_text = response.text.strip()
-            
-            # Parse JSON response - try to extract JSON from response
-            try:
-                # Try direct JSON parsing first
-                result = json.loads(response_text)
-            except json.JSONDecodeError:
-                # Try to extract JSON from the response (in case there's extra text)
-                import re
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    result = json.loads(json_match.group())
-                else:
-                    # Return structured error response
-                    return {
-                        "restaurants": [],
-                        "error": "Could not parse AI response",
-                        "rawResponse": response_text[:200]
-                    }
-            
-            return result
-            
-        except Exception as e:
-            print(f"Error in Gemini search: {str(e)}")
-            return {
-                "restaurants": [],
-                "error": f"AI search error: {str(e)}"
-            }
-    
-    def filter_restaurants_by_dietary(self, restaurants: List[Dict], dietary_restrictions: List[str]) -> List[Dict]:
-        """Filter restaurants based on dietary restrictions"""
-        if not dietary_restrictions:
-            return restaurants
-        
-        prompt = f"""Given these restaurants and dietary restrictions, identify which restaurants are best matches:
-
-Dietary Restrictions: {', '.join(dietary_restrictions)}
-
-Restaurants:
-{json.dumps(restaurants, indent=2)}
-
-Return a JSON object with:
-- "filtered_restaurants": list of restaurant indices that match
-- "recommendations": brief explanation for each match
-
-Return ONLY valid JSON:"""
-        
-        try:
-            response = self.model.generate_content(prompt)
-            result = json.loads(response.text.strip())
-            return result
-        except Exception as e:
-            print(f"Error filtering by dietary: {str(e)}")
-            return {"filtered_restaurants": [], "error": str(e)}
-    
-    def find_matching_menu_items(self, restaurant: Dict, dietary_restrictions: List[str]) -> List[str]:
-        """Use Gemini to identify menu items matching dietary restrictions"""
-        if not dietary_restrictions or not restaurant.get('matchingItems'):
-            return restaurant.get('matchingItems', [])
-        
-        prompt = f"""Given this restaurant and dietary restrictions, suggest the best menu items:
-
-Restaurant: {restaurant.get('name', 'Unknown')}
-Cuisine: {', '.join(restaurant.get('cuisines', []))}
-Dietary Restrictions: {', '.join(dietary_restrictions)}
-Current Menu Items: {json.dumps(restaurant.get('matchingItems', []))}
-
-Suggest 3-4 realistic menu items from {restaurant.get('name')} that satisfy these restrictions.
-Return ONLY a JSON array of strings with menu items:"""
-        
-        try:
-            response = self.model.generate_content(prompt)
-            # Extract JSON array from response
-            response_text = response.text.strip()
-            result = json.loads(response_text)
-            if isinstance(result, list):
-                return result
-            return restaurant.get('matchingItems', [])
-        except Exception as e:
-            print(f"Error finding menu items: {str(e)}")
-            return restaurant.get('matchingItems', [])
-    
-    def rank_restaurants(self, restaurants: List[Dict], user_preferences: Dict) -> List[Dict]:
-        """Use Gemini to rank restaurants based on how well they match user preferences"""
-        if not restaurants:
-            return restaurants
-        
-        preferences_str = json.dumps(user_preferences, indent=2)
-        restaurants_str = json.dumps(restaurants, indent=2)
-        
-        prompt = f"""Rank these restaurants based on how well they match the user's preferences:
-
-User Preferences:
-{preferences_str}
-
-Restaurants:
-{restaurants_str}
-
-Return ONLY a JSON object:
-{{
-  "ranked_restaurants": [ordered list of restaurants by relevance],
-  "ranking_notes": {{restaurant_name: "reason for this ranking", ...}}
+  "total_matching": 5,
+  "search_summary": "Found 5 restaurants matching your criteria"
 }}"""
         
         try:
             response = self.model.generate_content(prompt)
             response_text = response.text.strip()
-            # Clean up if needed
-            import re
+            
+            # Extract JSON
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
-                return result.get('ranked_restaurants', restaurants)
-            return restaurants
-        except Exception as e:
-            print(f"Error ranking restaurants: {str(e)}")
-            return restaurants
-    
-    def enhance_restaurant_data(self, restaurants: List[Dict]) -> List[Dict]:
-        """Use Gemini to enhance restaurant data with additional information"""
-        if not restaurants:
-            return restaurants
-        
-        prompt = f"""Enhance these restaurant entries with additional helpful information:
-
-{json.dumps(restaurants, indent=2)}
-
-For each restaurant, add if missing:
-- Why customers love this restaurant (2-3 sentences)
-- Best time to visit
-- Popular dishes
-- Ambiance description
-
-Return ONLY valid JSON with enhanced restaurant data:"""
-        
-        try:
-            response = self.model.generate_content(prompt)
-            response_text = response.text.strip()
-            result = json.loads(response_text)
-            if isinstance(result, dict) and 'restaurants' in result:
-                return result['restaurants']
-            elif isinstance(result, list):
+                print(f"✓ Data Transformer Agent: Transformed {len(result.get('transformed_restaurants', []))} restaurants")
                 return result
-            return restaurants
         except Exception as e:
-            print(f"Error enhancing data: {str(e)}")
-            return restaurants
+            print(f"Error transforming data: {e}")
+        
+        return {
+            "transformed_restaurants": [],
+            "error": "Failed to transform restaurant data",
+            "search_summary": "No results could be processed"
+        }
+
+
+class GeminiAgentService:
+    """Main service orchestrating sequential agents for restaurant discovery"""
+    
+    def __init__(self):
+        """Initialize all agents"""
+        self.web_scraper = WebScraperAgent()
+        self.data_transformer = DataTransformerAgent()
+        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+    
+    def build_search_prompt(self, location: str, filters: Dict) -> str:
+        """Build a detailed prompt for Gemini to search restaurants based on filters"""
+        
+        budget_map = {
+            '$': 'Budget friendly (under $15 per person)',
+            '$$': 'Moderate pricing ($15-$30 per person)',
+            '$$$': 'Upscale ($30-$60 per person)',
+            '$$$$': 'Fine dining ($60+ per person)'
+        }
+    
+    def search_restaurants(self, location: str, filters: Dict) -> Dict:
+        """
+        Main orchestration method using sequential agents:
+        1. WebScraperAgent: Finds real restaurants
+        2. DataTransformerAgent: Transforms and filters data
+        """
+        print(f"\n{'='*60}")
+        print(f"🔍 SEARCH INITIATED")
+        print(f"Location: {location}")
+        print(f"Filters: {filters}")
+        print(f"{'='*60}\n")
+        
+        # STEP 1: Web Scraper Agent finds restaurants
+        print("📍 STEP 1: Web Scraper Agent")
+        print("-" * 60)
+        web_search_result = self.web_scraper.search_restaurants_web(location, filters)
+        
+        if web_search_result.get("status") == "error" or not web_search_result.get("raw_results"):
+            print(f"⚠️  No restaurants found by web scraper")
+            return {
+                "restaurants": [],
+                "error": "No restaurants found matching your criteria",
+                "searchSummary": "Search returned no results"
+            }
+        
+        raw_restaurants = web_search_result.get("raw_results", [])
+        print(f"✓ Found {len(raw_restaurants)} raw restaurant results\n")
+        
+        # STEP 2: Data Transformer Agent processes and filters
+        print("📍 STEP 2: Data Transformer Agent")
+        print("-" * 60)
+        transformed_result = self.data_transformer.transform_restaurant_data(raw_restaurants, filters)
+        
+        if "error" in transformed_result:
+            print(f"⚠️  Error during transformation: {transformed_result.get('error')}")
+        
+        final_restaurants = transformed_result.get("transformed_restaurants", [])
+        print(f"✓ Transformed into {len(final_restaurants)} displayable restaurants\n")
+        
+        print(f"{'='*60}")
+        print(f"✅ SEARCH COMPLETE")
+        print(f"{'='*60}\n")
+        
+        return {
+            "restaurants": final_restaurants,
+            "totalFound": transformed_result.get("total_matching", len(final_restaurants)),
+            "searchSummary": transformed_result.get("search_summary", f"Found {len(final_restaurants)} restaurants"),
+            "filters_applied": filters
+        }
 

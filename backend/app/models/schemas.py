@@ -29,9 +29,12 @@ class RestaurantResponse(BaseModel):
     menuLink: Optional[str] = None
     matchingItems: Optional[List[str]] = []
     phone: Optional[str] = None
-    hours: Optional[dict] = None
+    hours: Optional[str] = None
     accessibility: Optional[List[str]] = []
     serviceTypes: Optional[List[str]] = []
+    tags: Optional[List[str]] = []
+    matchScore: Optional[int] = None
+    whyItMatches: Optional[str] = None
 
 class SearchResponse(BaseModel):
     totalFound: int
