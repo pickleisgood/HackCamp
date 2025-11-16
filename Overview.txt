@@ -1,0 +1,48 @@
+You are a manager at a prestigious company and you need to make products of upmost quality.
+This website should look clean and have the theme: PLACEHOLDER
+The website should be well written with clean code and should look professional. It should have user friendly UI and design.
+
+We’re making a web app to find restaurants based on a user’s location, budget, dietary restrictions (allergies or preferences), ratings and so on.
+
+-the location is typed in the search bar
+-the budget should be picked as a drop-down menu
+-the dietary restrictions should be inputted in a scrollable drop-down menu
+-the ratings on platforms such as google maps 
+
+Separately, pick a creative name for this website and a short description of what this web app does
+
+Landing page with a search bar in the centre where a user can type their location.
+
+Create a button where an overlay of options appears, 
+
+Google maps embedded that zooms in to the specified location and radius
+This information should be passed to a python fastAPI backend where a google adk agent, with model set to gemini 2.5 flash gemini key:AIzaSyAB8Bd87WX51mNeSkkDAb2sfDd4wu_5-Ks which will scour the web based on restrictions and return findings to frontend
+
+Have restaurants that are found listed as a pin on google maps
+
+Selected restaurants should appear on the bottom of the page (below the maps embed), and be infinitely scrollable and should list information about the restaurant: this includes its name, some photos, photos of the food, names of items that do pass the dietary restrictions
+
+Dropdown menu to select common allergies, price ranges, cuisine, other preferences
+Result should show found x number of restaurants, and provides the links for each of their menus
+
+Preferences to potentially add:
+Eating Experience Filters
+Takeout / Delivery / Dine-In
+Outdoor seating
+Noise level (quiet, moderate, loud)
+Family-friendly / pet-friendly
+♿ Accessibility Preferences
+Wheelchair accessible entrance
+Accessible washrooms
+Braille or allergen-aware menu options
+🕐 Operational Preferences
+Open now / open late / breakfast / lunch / dinner
+Wait time estimate (if API available)
+🏷 Ratings & Platform Data
+Google Maps rating minimum: 3.5+  4.0+, 4.5+
+Yelp or TripAdvisor integration (optional)
+✨ Useful “Bonus” Filters
+If you want something unique and pitch-worthy:
+Sustainability score (local sourcing, composting, etc.)
+Social vibe: study-friendly, date night, large groups
+Spice levels (mild, medium, super spicy)
