@@ -1,0 +1,14 @@
+.restaurant-list {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.restaurant-list > div {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
