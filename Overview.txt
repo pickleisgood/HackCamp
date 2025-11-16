@@ -16,7 +16,7 @@ Landing page with a search bar in the centre where a user can type their locatio
 Create a button where an overlay of options appears, 
 
 Google maps embedded that zooms in to the specified location and radius
-This information should be passed to a python fastAPI backend where a google adk agent, with model set to gemini 2.5 flash gemini key:AIzaSyAB8Bd87WX51mNeSkkDAb2sfDd4wu_5-Ks which will scour the web based on restrictions and return findings to frontend
+This information should be passed to a python fastAPI backend where a google adk agent, with model set to gemini 2.5 flash gemini key:___ which will scour the web based on restrictions and return findings to frontend
 
 Have restaurants that are found listed as a pin on google maps
 

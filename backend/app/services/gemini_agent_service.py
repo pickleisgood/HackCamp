@@ -4,6 +4,7 @@ import re
 from typing import List, Dict, Optional, Any
 import google.generativeai as genai
 from app.config import settings
+from app.services.google_maps_service import GoogleMapsService
 import requests
 
 # Configure Gemini API
@@ -19,6 +20,8 @@ class WebScraperAgent:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
+        # Initialize Google Maps service for photo fetching
+        self.google_maps = GoogleMapsService()
     
     def search_restaurants_web(self, location: str, filters: Dict) -> Dict:
         """
@@ -171,14 +174,29 @@ Return ONLY a valid JSON array with no markdown:
             json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
             if json_match:
                 raw_results = json.loads(json_match.group())
-                # Ensure all results have required fields
+                # Ensure all results have required fields and fetch real photos
                 for result in raw_results:
                     if 'latitude' not in result or not result['latitude']:
                         result['latitude'] = self._geocode_address(result.get('address', location))['lat']
                     if 'longitude' not in result or not result['longitude']:
                         result['longitude'] = self._geocode_address(result.get('address', location))['lng']
-                    if 'image' not in result or not result['image']:
-                        result['image'] = f"https://via.placeholder.com/400x300?text={result.get('name', 'Restaurant')}"
+                    
+                    # Always try to get real photo from Google Maps
+                    restaurant_name = result.get('name', '')
+                    existing_image = result.get('image', '')
+                    
+                    # If no image or image is a placeholder, try to fetch from Google Maps
+                    if restaurant_name and (not existing_image or 'placeholder' in existing_image.lower() or 'unsplash' not in existing_image.lower()):
+                        print(f"📸 Fetching photo for {restaurant_name}...")
+                        photo_url = self.google_maps.get_restaurant_photo(restaurant_name, location)
+                        if photo_url:
+                            result['image'] = photo_url
+                            print(f"✓ Found photo for {restaurant_name}")
+                        elif not existing_image:
+                            # Fallback to placeholder if no photo found
+                            result['image'] = f"https://via.placeholder.com/400x300?text={restaurant_name.replace(' ', '+')}"
+                    elif not result.get('image'):
+                        result['image'] = f"https://via.placeholder.com/400x300?text={restaurant_name.replace(' ', '+') if restaurant_name else 'Restaurant'}"
                 
                 return {
                     "raw_results": raw_results if isinstance(raw_results, list) else [],
@@ -260,6 +278,7 @@ TASK:
 3. Sort by match_score descending
 4. Include coordinates as lat/lon (estimate if needed)
 5. IMPORTANT: Only include restaurants that can accommodate the dietary restrictions
+6. CRITICAL: Preserve the "image" field from the original restaurant data - do not remove or modify image URLs
 
 Return ONLY valid JSON:
 {{
@@ -273,7 +292,7 @@ Return ONLY valid JSON:
       "rating": 4.5,
       "budget": "$$ or $$$",
       "cuisines": ["type1", "type2"],
-      "image": "url_if_available",
+      "image": "url_if_available - MUST preserve original image URL from input",
       "website": "url",
       "phone": "phone_number",
       "hours": "hours",
@@ -298,7 +317,22 @@ Return ONLY valid JSON:
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
-                print(f"✓ Data Transformer Agent: Transformed {len(result.get('transformed_restaurants', []))} restaurants")
+                
+                # Post-process to ensure images are preserved from original data
+                transformed_restaurants = result.get('transformed_restaurants', [])
+                for transformed in transformed_restaurants:
+                    # Find matching original restaurant by name
+                    original = next(
+                        (r for r in raw_restaurants if r.get('name') == transformed.get('name')),
+                        None
+                    )
+                    if original and original.get('image') and not transformed.get('image'):
+                        transformed['image'] = original.get('image')
+                    elif original and original.get('image'):
+                        # Prefer original image if it exists
+                        transformed['image'] = original.get('image')
+                
+                print(f"✓ Data Transformer Agent: Transformed {len(transformed_restaurants)} restaurants")
                 return result
         except Exception as e:
             print(f"Error transforming data: {e}")
@@ -380,8 +414,20 @@ Return ONLY valid JSON:
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
+                
+                # Post-process to ensure images are preserved
+                validated_restaurants = result.get('validated_restaurants', [])
+                for validated in validated_restaurants:
+                    # Find matching original restaurant by name
+                    original = next(
+                        (r for r in restaurants if r.get('name') == validated.get('name')),
+                        None
+                    )
+                    if original and original.get('image'):
+                        validated['image'] = original.get('image')
+                
                 removed = result.get('removed_count', 0)
-                validated = len(result.get('validated_restaurants', []))
+                validated = len(validated_restaurants)
                 print(f"✓ Dietary Validation Agent: {validated} restaurants passed validation, {removed} removed")
                 return result
         except Exception as e:
