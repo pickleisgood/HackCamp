@@ -3,7 +3,7 @@
 #############################################################################
 # HackCamp - Restaurant Finder Master Startup Script
 # Usage: ./run.sh <GEMINI_API_KEY> <GOOGLE_MAPS_API_KEY>
-# Example: ./run.sh AIzaSyAB8Bd87WX51mNeSkkDAb2sfDd4wu_5-Ks yAIzaSyD1RfZ4-onqnSVPN-tJVGThxWPOTTz3qFs
+# Example: ./run.sh your_gemini_api_key your_google_maps_api_key
 #############################################################################
 
 # Color codes for output
@@ -41,7 +41,7 @@ if [ $# -ne 2 ]; then
     echo "Usage: ./run.sh <GEMINI_API_KEY> <GOOGLE_MAPS_API_KEY>"
     echo ""
     echo "Example:"
-    echo "  ./run.sh AIzaSyAB8Bd87WX51mNeSkkDAb2sfDd4wu_5-Ks yAIzaSyD1RfZ4-onqnSVPN-tJVGThxWPOTTz3qFs"
+    echo "  ./run.sh your_gemini_api_key your_google_maps_api_key"
     echo ""
     exit 1
 fi
