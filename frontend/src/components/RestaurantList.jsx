@@ -26,7 +26,16 @@ function RestaurantList({ restaurants, loading }) {
         }
       >
         {restaurants.slice(0, displayedCount).map((restaurant, index) => (
-          <RestaurantCard key={index} restaurant={restaurant} />
+          <RestaurantCard 
+            key={index} 
+            restaurant={restaurant}
+            style={{ 
+              animationDelay: `${index * 0.1}s`,
+              animation: 'popIn 0.5s ease-out',
+              animationFillMode: 'forwards',
+              opacity: 0
+            }}
+          />
         ))}
       </InfiniteScroll>
     </div>

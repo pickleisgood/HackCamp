@@ -15,12 +15,31 @@ function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.0060 });
 
-  const handleSearch = async (searchLocation) => {
-    setLocation(searchLocation);
+  const handleSearch = async (searchLocation, searchFilters = null) => {
+    // Use provided location or current location state
+    const locationToUse = searchLocation || location;
+    // Use provided filters or current filters state
+    const filtersToUse = searchFilters !== null ? searchFilters : filters;
+    
+    // Update state with the values being used
+    if (searchLocation) {
+      setLocation(searchLocation);
+    }
+    if (searchFilters !== null) {
+      setFilters(searchFilters);
+    }
+    
+    // Validate location is provided
+    if (!locationToUse || !locationToUse.trim()) {
+      alert('Please enter a location to search for restaurants.');
+      return;
+    }
+    
     setLoading(true);
     try {
-      // Call backend API with filters
-      const response = await searchRestaurants(searchLocation, filters);
+      // Call backend API with current location and current filters (including dietary restrictions)
+      console.log('🔍 Searching with:', { location: locationToUse, filters: filtersToUse });
+      const response = await searchRestaurants(locationToUse, filtersToUse);
       
       if (response.restaurants && response.restaurants.length > 0) {
         setRestaurants(response.restaurants);
@@ -31,10 +50,13 @@ function LandingPage() {
             lng: response.restaurants[0].longitude
           });
         }
+      } else {
+        setRestaurants([]);
       }
     } catch (error) {
       console.error('Search error:', error);
       alert('Error searching restaurants. Please try again.');
+      setRestaurants([]);
     } finally {
       setLoading(false);
     }
@@ -45,8 +67,9 @@ function LandingPage() {
     setShowFilterOverlay(false);
     
     // Auto-search with new filters if location is set
+    // Pass the new filters explicitly to ensure they're used
     if (location.trim()) {
-      handleSearch(location);
+      handleSearch(location, newFilters);
     }
   };
 
@@ -60,6 +83,11 @@ function LandingPage() {
 
   return (
     <div className="landing-page">
+      {/* Logo in top left corner */}
+      <div className="logo-container">
+        <img src="/logo.png" alt="Logo" className="logo" />
+      </div>
+
       {/* Loading Popup */}
       <LoadingPopup 
         isVisible={loading} 
@@ -70,7 +98,7 @@ function LandingPage() {
       <div className="search-section">
         <h1>🍽️ Find Your Perfect Restaurant</h1>
         <p className="subtitle">Powered by AI • Personalized to Your Taste</p>
-        <SearchBar onSearch={handleSearch} />
+        <SearchBar onSearch={handleSearch} currentFilters={filters} />
         
         <div className="search-controls">
           <button 

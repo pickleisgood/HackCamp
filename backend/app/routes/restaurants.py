@@ -56,16 +56,62 @@ async def search_restaurants(request: SearchRequest) -> SearchResponse:
         restaurants_data = []
         for restaurant in ai_response.get('restaurants', []):
             try:
+                # Only use REAL restaurant images - no generic fallbacks or example URLs
+                restaurant_image = restaurant.get('image')
+                restaurant_name = restaurant.get('name', 'Unknown')
+                restaurant_website = restaurant.get('website')
+                
+                # Validate that image is a real restaurant image (not generic placeholder or example URL)
+                if restaurant_image:
+                    # Reject generic placeholder services and example.com URLs
+                    if any(generic in restaurant_image.lower() for generic in ['picsum', 'unsplash', 'placeholder', 'via.placeholder', 'example.com', 'example.org', 'lorem', 'dummy']):
+                        print(f"⚠️ Rejected invalid/placeholder URL for {restaurant_name}: {restaurant_image}")
+                        restaurant_image = None
+                    elif not restaurant_image.startswith('http'):
+                        print(f"⚠️ Invalid image URL for {restaurant_name}: {restaurant_image}")
+                        restaurant_image = None
+                
+                # If no valid image, try to fetch a real one
+                if not restaurant_image:
+                    print(f"📸 Attempting to fetch real restaurant image for {restaurant_name}...")
+                    from app.services.google_maps_service import GoogleMapsService
+                    google_maps = GoogleMapsService()
+                    
+                    # Try website first
+                    if restaurant_website:
+                        try:
+                            real_image = google_maps.get_image_from_website(restaurant_website, restaurant_name)
+                            if real_image:
+                                restaurant_image = real_image
+                                print(f"✓ Found real image from website for {restaurant_name}")
+                        except Exception as e:
+                            print(f"  ✗ Website scraping failed: {e}")
+                    
+                    # Try Google Maps if website didn't work
+                    if not restaurant_image:
+                        try:
+                            location = request.location
+                            real_image = google_maps.get_restaurant_photo(restaurant_name, location)
+                            if real_image:
+                                restaurant_image = real_image
+                                print(f"✓ Found real image from Google Maps for {restaurant_name}")
+                        except Exception as e:
+                            print(f"  ✗ Google Maps failed: {e}")
+                
+                if not restaurant_image:
+                    print(f"❌ No real restaurant image available for {restaurant_name} - will show placeholder in UI")
+                    restaurant_image = None
+                
                 restaurant_obj = RestaurantResponse(
                     id=restaurant.get('id', restaurant.get('name', '').replace(' ', '_').lower()),
-                    name=restaurant.get('name', 'Unknown'),
+                    name=restaurant_name,
                     address=restaurant.get('address', ''),
                     latitude=float(restaurant.get('latitude', 0)),
                     longitude=float(restaurant.get('longitude', 0)),
                     rating=float(restaurant.get('rating', 0)),
                     budget=restaurant.get('budget', ''),
                     cuisines=restaurant.get('cuisines', []),
-                    image=restaurant.get('image'),
+                    image=restaurant_image,  # Always set an image
                     website=restaurant.get('website'),
                     menuLink=restaurant.get('menuLink'),
                     matchingItems=restaurant.get('matching_menu_items', restaurant.get('matchingItems', [])),
@@ -77,9 +123,12 @@ async def search_restaurants(request: SearchRequest) -> SearchResponse:
                     matchScore=restaurant.get('match_score'),
                     whyItMatches=restaurant.get('why_it_matches'),
                 )
+                print(f"✅ Restaurant {restaurant_name} - Image: {restaurant_image}")
                 restaurants_data.append(restaurant_obj)
             except Exception as e:
                 print(f"⚠️ Error parsing restaurant data: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         print(f"✅ Found {len(restaurants_data)} restaurants")

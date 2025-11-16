@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import '../styles/SearchBar.css';
 
-function SearchBar({ onSearch }) {
+function SearchBar({ onSearch, currentFilters = null }) {
   const [input, setInput] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (input.trim()) {
-      onSearch(input);
+      // Pass the location and current filters to ensure both are used
+      onSearch(input, currentFilters);
+    } else {
+      alert('Please enter a location to search for restaurants.');
     }
   };
 

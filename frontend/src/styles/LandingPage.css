@@ -3,6 +3,30 @@
   flex-direction: column;
   height: 100vh;
   background: #fafafa;
+  position: relative;
+}
+
+.logo-container {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+  background: transparent;
+  padding: 0;
+  transition: transform 0.2s ease;
+}
+
+.logo-container:hover {
+  transform: scale(1.05);
+}
+
+.logo {
+  height: 80px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  -webkit-filter: brightness(0) invert(1);
 }
 
 .search-section {
@@ -137,6 +161,16 @@
     height: auto;
   }
 
+  .logo-container {
+    top: 10px;
+    left: 10px;
+    padding: 0;
+  }
+
+  .logo {
+    height: 60px;
+  }
+
   .search-section {
     padding: 30px 16px;
   }
@@ -178,6 +212,16 @@
 }
 
 @media (max-width: 480px) {
+  .logo-container {
+    top: 8px;
+    left: 8px;
+    padding: 0;
+  }
+
+  .logo {
+    height: 50px;
+  }
+
   .search-section {
     padding: 20px 12px;
   }

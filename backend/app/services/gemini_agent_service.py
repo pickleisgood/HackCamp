@@ -132,12 +132,21 @@ For each restaurant provide ACCURATE information:
 - Real address
 - Actual cuisine type
 - Real phone number (if known)
-- Website
+- Website (REQUIRED - must be a real website URL)
 - Approximate price range
 - Real menu items matching dietary needs
 - Accessibility features
 - Latitude and Longitude coordinates
-- Image URL (use unsplash.com food images or real restaurant photos if available)
+- Image URL (CRITICAL - MUST provide a REAL, WORKING image URL starting with http:// or https://. 
+  * DO NOT use example.com, example.org, placeholder.com, or any fake/example URLs
+  * DO NOT make up URLs - only use URLs that actually exist and work
+  * Use one of these in priority order:
+    1. Real restaurant photo from their actual website (scrape the real website URL)
+    2. Building/exterior photo of the restaurant from Google Maps or reviews
+    3. Food photo from the restaurant's actual menu or social media
+  * If you cannot find a real working image URL, leave the image field empty or set it to null
+  * NEVER use example.com, example.org, or any placeholder domains
+  * NEVER make up fake URLs - only use URLs that you know exist and are accessible)
 
 Return ONLY a valid JSON array with no markdown:
 [
@@ -181,22 +190,82 @@ Return ONLY a valid JSON array with no markdown:
                     if 'longitude' not in result or not result['longitude']:
                         result['longitude'] = self._geocode_address(result.get('address', location))['lng']
                     
-                    # Always try to get real photo from Google Maps
+                    # ALWAYS ensure there's a valid image URL - try multiple sources
                     restaurant_name = result.get('name', '')
                     existing_image = result.get('image', '')
+                    website_url = result.get('website', '')
                     
-                    # If no image or image is a placeholder, try to fetch from Google Maps
-                    if restaurant_name and (not existing_image or 'placeholder' in existing_image.lower() or 'unsplash' not in existing_image.lower()):
+                    # Clean up existing image URL - reject fake/example URLs
+                    if existing_image:
+                        existing_image = existing_image.strip()
+                        # Remove placeholder URLs and example.com URLs
+                        invalid_domains = ['placeholder', 'via.placeholder', 'example.com', 'example.org', 'lorem', 'dummy', 'test.com']
+                        if any(invalid in existing_image.lower() for invalid in invalid_domains):
+                            print(f"  ⚠️ Rejected invalid/example URL: {existing_image}")
+                            existing_image = ''
+                    
+                    # If no valid image, try to fetch from multiple sources
+                    if not existing_image or not existing_image.startswith('http'):
                         print(f"📸 Fetching photo for {restaurant_name}...")
-                        photo_url = self.google_maps.get_restaurant_photo(restaurant_name, location)
-                        if photo_url:
-                            result['image'] = photo_url
-                            print(f"✓ Found photo for {restaurant_name}")
-                        elif not existing_image:
-                            # Fallback to placeholder if no photo found
-                            result['image'] = f"https://via.placeholder.com/400x300?text={restaurant_name.replace(' ', '+')}"
-                    elif not result.get('image'):
-                        result['image'] = f"https://via.placeholder.com/400x300?text={restaurant_name.replace(' ', '+') if restaurant_name else 'Restaurant'}"
+                        photo_url = None
+                        
+                        # First, try to get from restaurant website if available
+                        if website_url:
+                            print(f"  → Trying to fetch REAL restaurant image from website: {website_url}")
+                            try:
+                                photo_url = self.google_maps.get_image_from_website(website_url, restaurant_name)
+                                if photo_url:
+                                    result['image'] = photo_url
+                                    print(f"✓ Found REAL restaurant photo from website for {restaurant_name}")
+                            except Exception as e:
+                                print(f"  ✗ Website scraping failed: {e}")
+                        
+                        # If website scraping didn't work, try Google Maps (REAL restaurant photos)
+                        if not photo_url:
+                            print(f"  → Trying Google Maps for REAL restaurant photo...")
+                            try:
+                                photo_url = self.google_maps.get_restaurant_photo(restaurant_name, location)
+                                if photo_url:
+                                    result['image'] = photo_url
+                                    print(f"✓ Found REAL restaurant photo from Google Maps for {restaurant_name}")
+                                else:
+                                    print(f"  ⚠️ No real restaurant photo found in Google Maps for {restaurant_name}")
+                            except Exception as e:
+                                print(f"  ✗ Google Maps failed: {e}")
+                        
+                        # CRITICAL: Only use real restaurant images - NO generic fallbacks
+                        if not result.get('image') or not result['image'].startswith('http'):
+                            print(f"  ❌ WARNING: No real restaurant image found for {restaurant_name} - image will be missing")
+                            # Don't set a generic fallback - let it be None so frontend can handle it
+                            result['image'] = None
+                    else:
+                        # Image exists, but verify it's a real restaurant image (not generic placeholder)
+                        if not existing_image.startswith('http'):
+                            result['image'] = None
+                        elif any(generic in existing_image.lower() for generic in ['picsum', 'unsplash', 'placeholder', 'via.placeholder', 'example.com', 'example.org', 'lorem', 'dummy']):
+                            # If it's a generic placeholder, try to get a real one
+                            print(f"  ⚠️ Found generic placeholder for {restaurant_name}, trying to get real image...")
+                            if website_url:
+                                try:
+                                    real_photo = self.google_maps.get_image_from_website(website_url, restaurant_name)
+                                    if real_photo:
+                                        result['image'] = real_photo
+                                        print(f"✓ Replaced placeholder with real image from website")
+                                except:
+                                    pass
+                            if not result.get('image') or any(generic in result.get('image', '').lower() for generic in ['picsum', 'unsplash']):
+                                # Try Google Maps
+                                try:
+                                    real_photo = self.google_maps.get_restaurant_photo(restaurant_name, location)
+                                    if real_photo:
+                                        result['image'] = real_photo
+                                        print(f"✓ Replaced placeholder with real image from Google Maps")
+                                except:
+                                    pass
+                            # If still no real image, set to None
+                            if not result.get('image') or any(generic in result.get('image', '').lower() for generic in ['picsum', 'unsplash']):
+                                result['image'] = None
+                                print(f"  ❌ No real restaurant image available for {restaurant_name}")
                 
                 return {
                     "raw_results": raw_results if isinstance(raw_results, list) else [],
@@ -326,11 +395,16 @@ Return ONLY valid JSON:
                         (r for r in raw_restaurants if r.get('name') == transformed.get('name')),
                         None
                     )
-                    if original and original.get('image') and not transformed.get('image'):
+                    # Always ensure image exists
+                    if original and original.get('image') and original.get('image').startswith('http'):
                         transformed['image'] = original.get('image')
-                    elif original and original.get('image'):
-                        # Prefer original image if it exists
-                        transformed['image'] = original.get('image')
+                    elif not transformed.get('image') or not transformed.get('image', '').startswith('http'):
+                        # Generate fallback if no valid image
+                        import hashlib
+                        restaurant_name = transformed.get('name', 'restaurant')
+                        seed = hashlib.md5(restaurant_name.encode()).hexdigest()[:8]
+                        transformed['image'] = f"https://picsum.photos/seed/{seed}/400/300"
+                        print(f"📸 Added fallback image for {restaurant_name}: {transformed['image']}")
                 
                 print(f"✓ Data Transformer Agent: Transformed {len(transformed_restaurants)} restaurants")
                 return result
@@ -423,8 +497,16 @@ Return ONLY valid JSON:
                         (r for r in restaurants if r.get('name') == validated.get('name')),
                         None
                     )
-                    if original and original.get('image'):
+                    # Always ensure image exists
+                    if original and original.get('image') and original.get('image').startswith('http'):
                         validated['image'] = original.get('image')
+                    elif not validated.get('image') or not validated.get('image', '').startswith('http'):
+                        # Generate fallback if no valid image
+                        import hashlib
+                        restaurant_name = validated.get('name', 'restaurant')
+                        seed = hashlib.md5(restaurant_name.encode()).hexdigest()[:8]
+                        validated['image'] = f"https://picsum.photos/seed/{seed}/400/300"
+                        print(f"📸 Added fallback image for {restaurant_name}: {validated['image']}")
                 
                 removed = result.get('removed_count', 0)
                 validated = len(validated_restaurants)

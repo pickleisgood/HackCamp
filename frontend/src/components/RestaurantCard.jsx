@@ -1,21 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/RestaurantCard.css';
 
-function RestaurantCard({ restaurant }) {
+function RestaurantCard({ restaurant, style }) {
   const [imageError, setImageError] = useState(false);
+  
+  // Only use REAL restaurant images - show placeholder if no real image available
+  const getImageUrl = () => {
+    // Only use if it's a real restaurant image (not generic placeholder or example URL)
+    if (restaurant.image && 
+        restaurant.image.startsWith('http') && 
+        !restaurant.image.includes('picsum') && 
+        !restaurant.image.includes('unsplash') &&
+        !restaurant.image.includes('placeholder') &&
+        !restaurant.image.includes('example.com') &&
+        !restaurant.image.includes('example.org') &&
+        !restaurant.image.includes('lorem') &&
+        !restaurant.image.includes('dummy')) {
+      return restaurant.image;
+    }
+    // Return null if no real image (will show placeholder SVG)
+    return null;
+  };
 
+  const imageSrc = getImageUrl();
+
+  // Placeholder for when no real restaurant image is available
+  const defaultPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23e8e8e8;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23d0d0d0;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23grad)' width='400' height='300'/%3E%3Ctext fill='%23888' font-family='Arial, sans-serif' font-size='48' font-weight='normal' x='200' y='130' text-anchor='middle' dominant-baseline='middle'%3E🍽️%3C/text%3E%3Ctext fill='%23666' font-family='Arial, sans-serif' font-size='14' x='200' y='170' text-anchor='middle' dominant-baseline='middle'%3ERestaurant Image%3C/text%3E%3Ctext fill='%23999' font-family='Arial, sans-serif' font-size='12' x='200' y='190' text-anchor='middle' dominant-baseline='middle'%3ENot Available%3C/text%3E%3C/svg%3E";
+  
+  // Final image source - use real image or placeholder
+  const finalImageSrc = imageSrc || defaultPlaceholder;
+  
+  // Update error state when image fails
   const handleImageError = () => {
+    console.log(`Real restaurant image failed to load for ${restaurant.name}:`, imageSrc);
     setImageError(true);
   };
 
+  // Log image URL for debugging
+  useEffect(() => {
+    if (restaurant.image && imageSrc) {
+      console.log(`✅ Restaurant: ${restaurant.name}, REAL Image URL: ${restaurant.image}`);
+    } else {
+      console.warn(`⚠️ Restaurant: ${restaurant.name} has no REAL restaurant image available`);
+    }
+  }, [restaurant.name, restaurant.image, imageSrc]);
+
   return (
-    <div className="restaurant-card">
+    <div className="restaurant-card" style={style}>
       <div className="card-image">
         <img 
-          src={imageError ? 'https://via.placeholder.com/400x300?text=No+Image' : (restaurant.image || 'https://via.placeholder.com/400x300')} 
+          src={finalImageSrc}
           alt={restaurant.name}
           onError={handleImageError}
           loading="lazy"
+          key={`${restaurant.name}-${imageSrc || 'placeholder'}`} // Force re-render when image changes
         />
       </div>
 
