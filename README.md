@@ -19,16 +19,19 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-# Add API keys to .env (Google Maps, Gemini)
-python run.py
+python3 run.py <GOOGLE_MAPS_API_KEY> <GEMINI_API_KEY>
 ```
 Backend runs at `http://localhost:8000`
+
+Example:
+```bash
+python3 run.py AIzaSyAB8Bd87WX51mNeSkkDAb2sfDd4wu_5-Ks AIzaSyD1RfZ4-onqnSVPN-tJVGThxWPOTTz3qFs
+```
 
 ### Frontend
 ```bash
 cd frontend
 npm install
-# Add API keys to .env
 npm start
 ```
 Frontend runs at `http://localhost:3000`
