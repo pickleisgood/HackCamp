@@ -70,6 +70,63 @@ def check_arguments():
     
     return sys.argv[1], sys.argv[2]
 
+def check_prerequisites():
+    """Check if all required tools are installed"""
+    print_header("Checking Prerequisites")
+    
+    issues = []
+    
+    # Check Python
+    print_info(f"Python version: {sys.version.split()[0]}", )
+    if sys.version_info < (3, 8):
+        issues.append("Python 3.8+ required (you have {})".format(sys.version.split()[0]))
+    else:
+        print_success("Python 3.8+ ✓")
+    
+    # Check npm
+    if check_command_exists("npm"):
+        try:
+            result = subprocess.run(["npm", "--version"], capture_output=True, text=True)
+            npm_version = result.stdout.strip()
+            print_success(f"npm {npm_version} ✓")
+        except:
+            issues.append("npm found but cannot determine version")
+    else:
+        issues.append("npm is NOT installed")
+        print_error("npm not found ✗")
+    
+    # If there are issues, show instructions and exit
+    if issues:
+        print()
+        print_header("Prerequisites Not Met")
+        print()
+        for issue in issues:
+            print_error(issue)
+        print()
+        print("To fix:")
+        print()
+        if "npm" in str(issues):
+            print("1. Install Node.js (includes npm):")
+            print("   → Download from https://nodejs.org/")
+            print("   → Choose LTS (Long Term Support) version")
+            print("   → Run the installer")
+            print("   → Restart your terminal/PowerShell")
+            print()
+        if "Python" in str(issues):
+            print("2. Install Python 3.8+:")
+            print("   → Download from https://www.python.org/")
+            print("   → Run the installer")
+            print("   → Restart your terminal/PowerShell")
+            print()
+        print("After installing, verify with:")
+        print("  python --version")
+        print("  npm --version")
+        print()
+        sys.exit(1)
+    
+    print()
+    print_success("All prerequisites met! ✓")
+
 def setup_backend(script_dir, gemini_key, maps_key):
     print_header("Setting up Backend")
     
@@ -95,16 +152,47 @@ FRONTEND_URL=http://localhost:3000
             [sys.executable, "-m", "pip", "install", "-r", "requirements.txt", "--quiet"],
             check=True,
             capture_output=False,
-            text=True
+            text=True,
+            timeout=300
         )
         print_success("Python dependencies installed")
-    except subprocess.CalledProcessError as e:
-        print_error(f"Failed to install Python dependencies: {e}")
-        # Continue anyway - dependencies might already be installed
+    except subprocess.TimeoutExpired:
+        print_error("Dependency installation timed out (5+ minutes)")
         print_info("Attempting to continue...")
+    except subprocess.CalledProcessError as e:
+        print_error(f"Failed to install Python dependencies")
+        print_info("Attempting to continue (dependencies might already be installed)...")
+    except Exception as e:
+        print_error(f"Error installing dependencies: {e}")
+        print_info("Attempting to continue...")
+
+def check_command_exists(command):
+    """Check if a command exists in the system PATH"""
+    try:
+        subprocess.run(
+            [command, "--version"],
+            capture_output=True,
+            check=True
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
 
 def setup_frontend(script_dir, maps_key):
     print_header("Setting up Frontend")
+    
+    # Check if npm is installed
+    if not check_command_exists("npm"):
+        print_error("npm is not installed or not in PATH!")
+        print()
+        print("To fix this:")
+        print("1. Download Node.js from https://nodejs.org/")
+        print("2. Install it (includes npm)")
+        print("3. Restart your terminal/PowerShell")
+        print("4. Run this script again")
+        print()
+        print("After installation, verify with: npm --version")
+        sys.exit(1)
     
     frontend_dir = Path(script_dir) / "frontend"
     os.chdir(frontend_dir)
@@ -124,10 +212,14 @@ REACT_APP_BACKEND_URL=http://localhost:8000
     if not node_modules.exists():
         print_info("Installing npm dependencies (this may take a few minutes)...")
         try:
-            subprocess.run(["npm", "install", "--quiet"], check=True, capture_output=False)
+            subprocess.run(["npm", "install"], check=True, capture_output=False)
             print_success("npm dependencies installed")
         except subprocess.CalledProcessError as e:
             print_error(f"Failed to install npm dependencies: {e}")
+            sys.exit(1)
+        except FileNotFoundError:
+            print_error("npm command not found!")
+            print("Please install Node.js from https://nodejs.org/")
             sys.exit(1)
     else:
         print_success("npm dependencies already installed")
@@ -161,6 +253,11 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
     
     print_header("🚀 HackCamp - Restaurant Finder Starting")
+    print()
+    
+    # Check prerequisites FIRST
+    check_prerequisites()
+    print()
     
     # Setup backend
     setup_backend(str(script_dir), gemini_key, maps_key)

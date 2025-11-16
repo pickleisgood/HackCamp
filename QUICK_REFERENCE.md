@@ -46,8 +46,10 @@ python .\run.py AIzaSyAB8Bd87WX51mNeSkkDAb2sfDd4wu_5-Ks yAIzaSyD1RfZ4-onqnSVPN-t
 | **Run app** | `python3 run.py <GEMINI_KEY> <MAPS_KEY>` |
 | **Stop servers** | `Ctrl+C` |
 | **Kill stuck process (macOS)** | `lsof -i :8000 \| awk '{print $2}' \| xargs kill -9` |
-| **Check Python** | `python3 --version` |
+| **Kill stuck process (Windows)** | `taskkill /PID <PID> /F` |
+| **Check Python** | `python --version` |
 | **Check Node.js** | `npm --version` |
+| **Got npm error?** | See `WINDOWS_SETUP.md` |
 
 ---
 
