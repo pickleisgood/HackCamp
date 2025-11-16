@@ -131,22 +131,27 @@ For each restaurant provide ACCURATE information:
 - Real phone number (if known)
 - Website
 - Approximate price range
-- Real menu items
+- Real menu items matching dietary needs
 - Accessibility features
+- Latitude and Longitude coordinates
+- Image URL (use unsplash.com food images or real restaurant photos if available)
 
-Return ONLY a valid JSON array:
+Return ONLY a valid JSON array with no markdown:
 [
   {{
     "name": "restaurant name",
-    "address": "address",
-    "phone": "phone",
-    "website": "url",
-    "cuisine": ["type1"],
+    "address": "full address with street, city, state, zip",
+    "phone": "phone number",
+    "website": "https://website.com",
+    "cuisine": ["type1", "type2"],
     "rating": 4.5,
     "budget": "$$ or $$$",
     "hours": "Mon-Sun 11am-11pm",
-    "wheelchair_accessible": true/false,
-    "menu_items": ["dish1", "dish2", "dish3"],
+    "wheelchair_accessible": true,
+    "image": "https://image-url.com/photo.jpg",
+    "latitude": 37.7749,
+    "longitude": -122.4194,
+    "menu_items": ["dish1 - description", "dish2 - description"],
     "service_types": ["Dine-in", "Takeout", "Delivery"]
   }}
 ]"""
@@ -155,10 +160,26 @@ Return ONLY a valid JSON array:
             response = self.model.generate_content(prompt)
             response_text = response.text.strip()
             
+            # Remove markdown code blocks if present
+            if response_text.startswith('```'):
+                response_text = response_text.split('```')[1]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+            response_text = response_text.strip()
+            
             # Extract JSON array
             json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
             if json_match:
                 raw_results = json.loads(json_match.group())
+                # Ensure all results have required fields
+                for result in raw_results:
+                    if 'latitude' not in result or not result['latitude']:
+                        result['latitude'] = self._geocode_address(result.get('address', location))['lat']
+                    if 'longitude' not in result or not result['longitude']:
+                        result['longitude'] = self._geocode_address(result.get('address', location))['lng']
+                    if 'image' not in result or not result['image']:
+                        result['image'] = f"https://via.placeholder.com/400x300?text={result.get('name', 'Restaurant')}"
+                
                 return {
                     "raw_results": raw_results if isinstance(raw_results, list) else [],
                     "search_query": search_query,
@@ -173,6 +194,28 @@ Return ONLY a valid JSON array:
             "error": "Failed to generate restaurant data",
             "status": "error"
         }
+    
+    def _geocode_address(self, address: str) -> Dict:
+        """Simple geocoding - returns approximate coordinates"""
+        # This is a fallback - in production you'd use Google Geocoding API
+        # For now, return approximate coordinates for major cities
+        location_coords = {
+            'new york': {'lat': 40.7128, 'lng': -74.0060},
+            'los angeles': {'lat': 34.0522, 'lng': -118.2437},
+            'chicago': {'lat': 41.8781, 'lng': -87.6298},
+            'san francisco': {'lat': 37.7749, 'lng': -122.4194},
+            'seattle': {'lat': 47.6062, 'lng': -122.3321},
+            'boston': {'lat': 42.3601, 'lng': -71.0589},
+            'miami': {'lat': 25.7617, 'lng': -80.1918},
+        }
+        
+        address_lower = address.lower()
+        for city, coords in location_coords.items():
+            if city in address_lower:
+                return coords
+        
+        # Default to NYC if not found
+        return {'lat': 40.7128, 'lng': -74.0060}
 
 
 class DataTransformerAgent:
@@ -192,6 +235,10 @@ class DataTransformerAgent:
         restaurants_json = json.dumps(raw_restaurants, indent=2)
         filters_json = json.dumps(filters, indent=2)
         
+        # Build dietary requirements summary
+        dietary_requirements = filters.get('dietary', [])
+        dietary_str = ', '.join(dietary_requirements) if dietary_requirements else 'None specified'
+        
         prompt = f"""You are a data transformer. Process these restaurants and filters.
 
 RESTAURANTS:
@@ -200,16 +247,19 @@ RESTAURANTS:
 FILTERS (what user selected):
 {filters_json}
 
+DIETARY REQUIREMENTS: {dietary_str}
+
 TASK:
 1. Filter restaurants that match ALL user criteria exactly
 2. For each matching restaurant, add:
-   - match_score (0-100 based on how well it matches ALL filters)
-   - matching_menu_items (dishes that match dietary restrictions)
-   - why_it_matches (explanation for user)
+   - match_score (0-100 based on how well it matches ALL filters, especially dietary)
+   - matching_menu_items (dishes that match dietary restrictions - ONLY include items that fit their dietary needs)
+   - why_it_matches (explanation for user emphasizing dietary accommodation)
    - accessibility_features (list)
    - service_types_available (list)
 3. Sort by match_score descending
 4. Include coordinates as lat/lon (estimate if needed)
+5. IMPORTANT: Only include restaurants that can accommodate the dietary restrictions
 
 Return ONLY valid JSON:
 {{
@@ -232,7 +282,8 @@ Return ONLY valid JSON:
       "why_it_matches": "reason",
       "accessibility_features": ["wheelchair"],
       "service_types": ["Dine-in", "Takeout"],
-      "tags": ["tag1", "tag2"]
+      "tags": ["tag1", "tag2"],
+      "dietary_accommodation": "description of how they accommodate dietary needs"
     }}
   ],
   "total_matching": 5,
@@ -259,6 +310,90 @@ Return ONLY valid JSON:
         }
 
 
+class DietaryValidationAgent:
+    """Agent dedicated to validating that restaurants truly accommodate dietary restrictions"""
+    
+    def __init__(self):
+        """Initialize dietary validation agent"""
+        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+    
+    def validate_dietary_match(self, restaurants: List[Dict], dietary_requirements: List[str]) -> Dict:
+        """
+        Validate that restaurants genuinely accommodate dietary restrictions.
+        Removes restaurants that don't truly align with dietary needs.
+        """
+        if not dietary_requirements:
+            print("✓ Dietary Validation Agent: No dietary restrictions - skipping validation")
+            return {
+                "validated_restaurants": restaurants,
+                "total_validated": len(restaurants),
+                "removed_count": 0
+            }
+        
+        print(f"🥗 Dietary Validation Agent: Validating {len(restaurants)} restaurants against dietary requirements")
+        
+        restaurants_json = json.dumps(restaurants, indent=2)
+        dietary_str = ', '.join(dietary_requirements)
+        
+        prompt = f"""You are a dietary validation expert. Evaluate if these restaurants truly support these dietary needs.
+
+RESTAURANTS:
+{restaurants_json}
+
+DIETARY REQUIREMENTS TO VALIDATE: {dietary_str}
+
+TASK:
+1. For each restaurant, verify it ACTUALLY supports the dietary requirements
+2. Check their menu items and offerings align with the restrictions
+3. Remove restaurants that don't genuinely accommodate these dietary needs
+4. Keep only restaurants that have substantial menu options for these dietary requirements
+5. For kept restaurants, add "dietary_match_confidence" (0-100) indicating how well they accommodate
+
+RULES FOR EACH DIETARY REQUIREMENT:
+- Vegetarian: Must have substantial vegetable-based dishes, no meat
+- Vegan: Must have plant-based dishes with no animal products
+- Gluten-Free: Must offer gluten-free alternatives or naturally gluten-free dishes
+- Dairy-Free: Must have dishes without dairy products
+- Nut-Free: Must be able to prepare dishes without nuts
+- Halal: Must follow halal food preparation standards
+- Kosher: Must follow kosher food preparation standards
+
+Return ONLY valid JSON:
+{{
+  "validated_restaurants": [
+    {{
+      ...all restaurant fields,
+      "dietary_match_confidence": 95,
+      "dietary_validation_notes": "reason why this restaurant matches the dietary requirements"
+    }}
+  ],
+  "total_validated": 5,
+  "removed_count": 2,
+  "removal_reasons": ["Restaurant X didn't have enough vegetarian options", "Restaurant Y not certified"]
+}}"""
+        
+        try:
+            response = self.model.generate_content(prompt)
+            response_text = response.text.strip()
+            
+            # Extract JSON
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                removed = result.get('removed_count', 0)
+                validated = len(result.get('validated_restaurants', []))
+                print(f"✓ Dietary Validation Agent: {validated} restaurants passed validation, {removed} removed")
+                return result
+        except Exception as e:
+            print(f"Error validating dietary match: {e}")
+        
+        return {
+            "validated_restaurants": restaurants,
+            "total_validated": len(restaurants),
+            "removed_count": 0
+        }
+
+
 class GeminiAgentService:
     """Main service orchestrating sequential agents for restaurant discovery"""
     
@@ -266,6 +401,7 @@ class GeminiAgentService:
         """Initialize all agents"""
         self.web_scraper = WebScraperAgent()
         self.data_transformer = DataTransformerAgent()
+        self.dietary_validator = DietaryValidationAgent()
         self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
     
     def build_search_prompt(self, location: str, filters: Dict) -> str:
@@ -281,8 +417,9 @@ class GeminiAgentService:
     def search_restaurants(self, location: str, filters: Dict) -> Dict:
         """
         Main orchestration method using sequential agents:
-        1. WebScraperAgent: Finds real restaurants
+        1. WebScraperAgent: Finds real restaurants with dietary considerations
         2. DataTransformerAgent: Transforms and filters data
+        3. DietaryValidationAgent: Validates dietary accommodation
         """
         print(f"\n{'='*60}")
         print(f"🔍 SEARCH INITIATED")
@@ -290,7 +427,7 @@ class GeminiAgentService:
         print(f"Filters: {filters}")
         print(f"{'='*60}\n")
         
-        # STEP 1: Web Scraper Agent finds restaurants
+        # STEP 1: Web Scraper Agent finds restaurants (now with dietary awareness)
         print("📍 STEP 1: Web Scraper Agent")
         print("-" * 60)
         web_search_result = self.web_scraper.search_restaurants_web(location, filters)
@@ -314,8 +451,23 @@ class GeminiAgentService:
         if "error" in transformed_result:
             print(f"⚠️  Error during transformation: {transformed_result.get('error')}")
         
-        final_restaurants = transformed_result.get("transformed_restaurants", [])
-        print(f"✓ Transformed into {len(final_restaurants)} displayable restaurants\n")
+        transformed_restaurants = transformed_result.get("transformed_restaurants", [])
+        print(f"✓ Transformed into {len(transformed_restaurants)} displayable restaurants\n")
+        
+        # STEP 3: Dietary Validation Agent validates dietary restrictions
+        print("📍 STEP 3: Dietary Validation Agent")
+        print("-" * 60)
+        dietary_requirements = filters.get('dietary', [])
+        if dietary_requirements:
+            validation_result = self.dietary_validator.validate_dietary_match(
+                transformed_restaurants, 
+                dietary_requirements
+            )
+            final_restaurants = validation_result.get("validated_restaurants", [])
+            print(f"✓ Validated {len(final_restaurants)} restaurants for dietary requirements\n")
+        else:
+            final_restaurants = transformed_restaurants
+            print(f"✓ No dietary restrictions to validate\n")
         
         print(f"{'='*60}")
         print(f"✅ SEARCH COMPLETE")
@@ -323,8 +475,8 @@ class GeminiAgentService:
         
         return {
             "restaurants": final_restaurants,
-            "totalFound": transformed_result.get("total_matching", len(final_restaurants)),
-            "searchSummary": transformed_result.get("search_summary", f"Found {len(final_restaurants)} restaurants"),
+            "totalFound": len(final_restaurants),
+            "searchSummary": f"Found {len(final_restaurants)} restaurants matching your criteria",
             "filters_applied": filters
         }
 

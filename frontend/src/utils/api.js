@@ -25,7 +25,9 @@ export const getRestaurantDetails = async (restaurantId) => {
   }
 };
 
-export default {
+const api = {
   searchRestaurants,
   getRestaurantDetails,
 };
+
+export default api;

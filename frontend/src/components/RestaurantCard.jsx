@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import '../styles/RestaurantCard.css';
 
 function RestaurantCard({ restaurant }) {
+  const [imageError, setImageError] = useState(false);
+
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
   return (
     <div className="restaurant-card">
       <div className="card-image">
         <img 
-          src={restaurant.image || 'https://via.placeholder.com/300x200'} 
+          src={imageError ? 'https://via.placeholder.com/400x300?text=No+Image' : (restaurant.image || 'https://via.placeholder.com/400x300')} 
           alt={restaurant.name}
+          onError={handleImageError}
+          loading="lazy"
         />
       </div>
 
@@ -20,9 +28,19 @@ function RestaurantCard({ restaurant }) {
 
         <p className="address">{restaurant.address}</p>
 
+        {restaurant.phone && (
+          <p className="phone">📞 {restaurant.phone}</p>
+        )}
+
         <div className="budget">
           <span className="budget-indicator">{restaurant.budget || 'N/A'}</span>
         </div>
+
+        {restaurant.cuisines && restaurant.cuisines.length > 0 && (
+          <div className="cuisines">
+            <span className="cuisine-tag">{restaurant.cuisines.join(', ')}</span>
+          </div>
+        )}
 
         <div className="menu-items">
           <h4>Menu Items (Matching Dietary Restrictions)</h4>

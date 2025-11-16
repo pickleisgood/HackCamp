@@ -404,15 +404,10 @@ def main():
     print()
     
     try:
-        # Wait for both processes
+        # Keep the main process alive
+        # The backend and frontend will run independently
         while True:
-            if backend_proc and backend_proc.poll() is not None:
-                print_error("Backend process exited")
-                signal_handler(None, None)
-            if frontend_proc and frontend_proc.poll() is not None:
-                print_error("Frontend process exited")
-                signal_handler(None, None)
-            time.sleep(1)
+            time.sleep(10)
     except KeyboardInterrupt:
         signal_handler(None, None)
 
