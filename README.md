@@ -1,5 +1,7 @@
 # 🍽️ Restaurant Finder
 
+<img src="Images/logo.png" alt="Restaurant Finder Logo" width="200"/>
+
 A smart restaurant discovery platform that uses AI to find the perfect restaurant based on your preferences.
 
 ## What It Does
