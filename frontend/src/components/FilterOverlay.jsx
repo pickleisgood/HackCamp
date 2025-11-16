@@ -1,20 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/FilterOverlay.css';
 
-function FilterOverlay({ onApply, onClose }) {
+function FilterOverlay({ onApply, onClose, initialFilters = {} }) {
   const [filters, setFilters] = useState({
-    budget: [],
-    dietary: [],
-    cuisines: [],
-    minRating: 3.5,
-    serviceType: [],
-    accessibility: [],
-    operational: [],
+    budget: initialFilters.budget || [],
+    dietary: initialFilters.dietary || [],
+    cuisines: initialFilters.cuisines || [],
+    minRating: initialFilters.minRating || 3.5,
+    serviceType: initialFilters.serviceType || [],
+    accessibility: initialFilters.accessibility || [],
+    operational: initialFilters.operational || [],
   });
 
-  const budgetOptions = ['$', '$$', '$$$', '$$$$'];
+  // Budget with clear labels
+  const budgetOptions = [
+    { value: '$', label: '$ - Budget Friendly (Under $15/person)' },
+    { value: '$$', label: '$$ - Moderate ($15-$30/person)' },
+    { value: '$$$', label: '$$$ - Upscale ($30-$60/person)' },
+    { value: '$$$$', label: '$$$$ - Fine Dining ($60+/person)' }
+  ];
+
   const dietaryOptions = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Nut-Free', 'Halal', 'Kosher'];
-  const cuisineOptions = ['Italian', 'Asian', 'Mexican', 'Indian', 'American', 'French'];
+  const cuisineOptions = ['Italian', 'Asian', 'Mexican', 'Indian', 'American', 'French', 'Mediterranean', 'Thai', 'Japanese'];
   const serviceTypes = ['Dine-In', 'Takeout', 'Delivery'];
   const accessibilityOptions = ['Wheelchair Accessible', 'Accessible Washroom', 'Allergen Menu'];
   const operationalOptions = ['Open Now', 'Open Late', 'Breakfast', 'Lunch', 'Dinner'];
@@ -40,27 +47,52 @@ function FilterOverlay({ onApply, onClose }) {
     onApply(filters);
   };
 
+  const handleReset = () => {
+    setFilters({
+      budget: [],
+      dietary: [],
+      cuisines: [],
+      minRating: 3.5,
+      serviceType: [],
+      accessibility: [],
+      operational: [],
+    });
+  };
+
+  // Count active filters
+  const activeFilterCount = Object.values(filters).reduce((count, value) => {
+    if (Array.isArray(value)) return count + value.length;
+    return count;
+  }, 0);
+
   return (
     <div className="filter-overlay-backdrop" onClick={onClose}>
       <div className="filter-overlay" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
         <div className="filter-header">
-          <h2>Filters</h2>
+          <div className="filter-title-section">
+            <h2>🔍 Search Filters</h2>
+            {activeFilterCount > 0 && (
+              <span className="active-count-badge">{activeFilterCount} Active</span>
+            )}
+          </div>
           <button className="close-button" onClick={onClose}>✕</button>
         </div>
 
+        {/* Content */}
         <div className="filter-content">
           {/* Budget Filter */}
           <div className="filter-group">
-            <h3>Budget</h3>
+            <h3>💰 Budget</h3>
             <div className="filter-options">
               {budgetOptions.map(option => (
-                <label key={option}>
+                <label key={option.value} className="filter-label">
                   <input
                     type="checkbox"
-                    checked={filters.budget.includes(option)}
-                    onChange={() => handleFilterChange('budget', option)}
+                    checked={filters.budget.includes(option.value)}
+                    onChange={() => handleFilterChange('budget', option.value)}
                   />
-                  {option}
+                  <span className="label-text">{option.label}</span>
                 </label>
               ))}
             </div>
@@ -68,16 +100,16 @@ function FilterOverlay({ onApply, onClose }) {
 
           {/* Dietary Restrictions */}
           <div className="filter-group">
-            <h3>Dietary Restrictions</h3>
+            <h3>🥗 Dietary Restrictions</h3>
             <div className="filter-options">
               {dietaryOptions.map(option => (
-                <label key={option}>
+                <label key={option} className="filter-label">
                   <input
                     type="checkbox"
                     checked={filters.dietary.includes(option)}
                     onChange={() => handleFilterChange('dietary', option)}
                   />
-                  {option}
+                  <span className="label-text">{option}</span>
                 </label>
               ))}
             </div>
@@ -85,16 +117,16 @@ function FilterOverlay({ onApply, onClose }) {
 
           {/* Cuisines */}
           <div className="filter-group">
-            <h3>Cuisines</h3>
+            <h3>🍽️ Cuisines</h3>
             <div className="filter-options">
               {cuisineOptions.map(option => (
-                <label key={option}>
+                <label key={option} className="filter-label">
                   <input
                     type="checkbox"
                     checked={filters.cuisines.includes(option)}
                     onChange={() => handleFilterChange('cuisines', option)}
                   />
-                  {option}
+                  <span className="label-text">{option}</span>
                 </label>
               ))}
             </div>
@@ -102,16 +134,16 @@ function FilterOverlay({ onApply, onClose }) {
 
           {/* Service Type */}
           <div className="filter-group">
-            <h3>Service Type</h3>
+            <h3>🚗 Service Type</h3>
             <div className="filter-options">
               {serviceTypes.map(option => (
-                <label key={option}>
+                <label key={option} className="filter-label">
                   <input
                     type="checkbox"
                     checked={filters.serviceType.includes(option)}
                     onChange={() => handleFilterChange('serviceType', option)}
                   />
-                  {option}
+                  <span className="label-text">{option}</span>
                 </label>
               ))}
             </div>
@@ -119,16 +151,16 @@ function FilterOverlay({ onApply, onClose }) {
 
           {/* Accessibility */}
           <div className="filter-group">
-            <h3>Accessibility</h3>
+            <h3>♿ Accessibility</h3>
             <div className="filter-options">
               {accessibilityOptions.map(option => (
-                <label key={option}>
+                <label key={option} className="filter-label">
                   <input
                     type="checkbox"
                     checked={filters.accessibility.includes(option)}
                     onChange={() => handleFilterChange('accessibility', option)}
                   />
-                  {option}
+                  <span className="label-text">{option}</span>
                 </label>
               ))}
             </div>
@@ -136,16 +168,16 @@ function FilterOverlay({ onApply, onClose }) {
 
           {/* Operational */}
           <div className="filter-group">
-            <h3>Operational Hours</h3>
+            <h3>🕐 When to Eat</h3>
             <div className="filter-options">
               {operationalOptions.map(option => (
-                <label key={option}>
+                <label key={option} className="filter-label">
                   <input
                     type="checkbox"
                     checked={filters.operational.includes(option)}
                     onChange={() => handleFilterChange('operational', option)}
                   />
-                  {option}
+                  <span className="label-text">{option}</span>
                 </label>
               ))}
             </div>
@@ -153,10 +185,10 @@ function FilterOverlay({ onApply, onClose }) {
 
           {/* Minimum Rating */}
           <div className="filter-group">
-            <h3>Minimum Rating</h3>
-            <div className="filter-options">
+            <h3>⭐ Minimum Rating</h3>
+            <div className="filter-options rating-options">
               {ratingOptions.map(option => (
-                <label key={option}>
+                <label key={option} className="filter-label">
                   <input
                     type="radio"
                     name="rating"
@@ -164,16 +196,21 @@ function FilterOverlay({ onApply, onClose }) {
                     checked={filters.minRating === option}
                     onChange={() => handleRatingChange(option)}
                   />
-                  {option}+
+                  <span className="label-text">{option}+ Stars</span>
                 </label>
               ))}
             </div>
           </div>
         </div>
 
+        {/* Actions */}
         <div className="filter-actions">
-          <button className="apply-button" onClick={handleApply}>Apply Filters</button>
-          <button className="reset-button" onClick={onClose}>Cancel</button>
+          <button className="reset-button" onClick={handleReset}>
+            ↻ Reset All
+          </button>
+          <button className="apply-button" onClick={handleApply}>
+            🔍 Search ({activeFilterCount} filters)
+          </button>
         </div>
       </div>
     </div>

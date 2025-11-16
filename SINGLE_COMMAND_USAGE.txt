@@ -1,0 +1,53 @@
+═══════════════════════════════════════════════════════════════════════════════
+🎉 HACKCAMP - RUN WITH A SINGLE COMMAND
+═══════════════════════════════════════════════════════════════════════════════
+
+TO RUN THE ENTIRE APPLICATION:
+
+    python3 run.py <GEMINI_API_KEY> <GOOGLE_MAPS_API_KEY>
+
+EXAMPLE:
+
+    python3 run.py AIzaSyAB8Bd87WX51mNeSkkDAb2sfDd4wu_5-Ks yAIzaSyD1RfZ4-onqnSVPN-tJVGThxWPOTTz3qFs
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHAT IT DOES:
+
+✓ Creates backend .env with your API keys
+✓ Installs Python dependencies
+✓ Starts FastAPI backend on http://localhost:8000
+✓ Creates frontend .env with your API keys  
+✓ Installs npm dependencies
+✓ Starts React frontend on http://localhost:3000
+✓ Waits for both servers to be ready
+✓ Displays success message with URLs
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TIME TO RUN:
+
+First time:    5-10 minutes (installing dependencies)
+Subsequent:    30 seconds (dependencies cached)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TO STOP:
+
+Press Ctrl+C in the terminal
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ACCESS THE APP:
+
+Frontend: http://localhost:3000
+Backend:  http://localhost:8000
+API Docs: http://localhost:8000/docs
+
+═══════════════════════════════════════════════════════════════════════════════
+
+FOR FULL DOCUMENTATION:
+
+See START_HERE.md or QUICKSTART.md
+
+═══════════════════════════════════════════════════════════════════════════════

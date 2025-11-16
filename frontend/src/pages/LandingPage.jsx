@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import SearchBar from '../components/SearchBar';
 import FilterOverlay from '../components/FilterOverlay';
+import LoadingPopup from '../components/LoadingPopup';
 import MapContainer from '../components/MapContainer';
 import RestaurantList from '../components/RestaurantList';
+import { searchRestaurants } from '../utils/api';
 import '../styles/LandingPage.css';
 
 function LandingPage() {
@@ -16,36 +18,83 @@ function LandingPage() {
   const handleSearch = async (searchLocation) => {
     setLocation(searchLocation);
     setLoading(true);
-    // TODO: Call backend API to search restaurants
-    setLoading(false);
+    try {
+      // Call backend API with filters
+      const response = await searchRestaurants(searchLocation, filters);
+      
+      if (response.restaurants && response.restaurants.length > 0) {
+        setRestaurants(response.restaurants);
+        // Update map center to first restaurant or use geocoded location
+        if (response.restaurants[0]) {
+          setMapCenter({
+            lat: response.restaurants[0].latitude,
+            lng: response.restaurants[0].longitude
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      alert('Error searching restaurants. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
     setShowFilterOverlay(false);
-    // TODO: Re-fetch restaurants with new filters
+    
+    // Auto-search with new filters if location is set
+    if (location.trim()) {
+      handleSearch(location);
+    }
+  };
+
+  const formatFiltersSummary = () => {
+    const counts = Object.values(filters).reduce((count, value) => {
+      if (Array.isArray(value)) return count + value.length;
+      return count;
+    }, 0);
+    return counts > 0 ? `${counts} filters active` : 'No filters';
   };
 
   return (
     <div className="landing-page">
+      {/* Loading Popup */}
+      <LoadingPopup 
+        isVisible={loading} 
+        message="🤖 AI Agent searching for perfect restaurants matching your preferences..."
+      />
+
+      {/* Search Section */}
       <div className="search-section">
-        <h1>Find Your Perfect Restaurant</h1>
+        <h1>🍽️ Find Your Perfect Restaurant</h1>
+        <p className="subtitle">Powered by AI • Personalized to Your Taste</p>
         <SearchBar onSearch={handleSearch} />
-        <button 
-          className="filter-button"
-          onClick={() => setShowFilterOverlay(!showFilterOverlay)}
-        >
-          🔧 Filters
-        </button>
+        
+        <div className="search-controls">
+          <button 
+            className="filter-button"
+            onClick={() => setShowFilterOverlay(!showFilterOverlay)}
+          >
+            🔧 Refine Search
+          </button>
+          <span className="filter-status">
+            {formatFiltersSummary()}
+          </span>
+        </div>
       </div>
 
+      {/* Filter Overlay */}
       {showFilterOverlay && (
         <FilterOverlay 
           onApply={handleFilterChange}
           onClose={() => setShowFilterOverlay(false)}
+          initialFilters={filters}
         />
       )}
 
+      {/* Main Content */}
       <div className="main-content">
         <div className="map-section">
           <MapContainer 
@@ -55,11 +104,19 @@ function LandingPage() {
         </div>
 
         <div className="results-section">
-          <h2>
-            {restaurants.length > 0 
-              ? `Found ${restaurants.length} restaurants` 
-              : 'No restaurants found'}
-          </h2>
+          <div className="results-header">
+            <h2>
+              {loading 
+                ? '⏳ Searching...' 
+                : restaurants.length > 0 
+                  ? `✓ Found ${restaurants.length} restaurants` 
+                  : '🔍 Search to discover restaurants'}
+            </h2>
+            {restaurants.length > 0 && (
+              <span className="result-count-badge">{restaurants.length}</span>
+            )}
+          </div>
+          
           <RestaurantList 
             restaurants={restaurants}
             loading={loading}
