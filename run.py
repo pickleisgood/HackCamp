@@ -10,6 +10,7 @@ import os
 import subprocess
 import time
 import signal
+import platform
 from pathlib import Path
 
 # Color codes for output
@@ -37,6 +38,18 @@ def print_error(text):
 def print_info(text):
     print(f"{YELLOW}ℹ {text}{NC}")
 
+def print_warning(text):
+    print(f"{YELLOW}⚠ {text}{NC}")
+
+def check_command_exists(command):
+    """Check if a command exists in PATH"""
+    result = subprocess.run(
+        ["which" if os.name != "nt" else "where", command],
+        capture_output=True,
+        text=True
+    )
+    return result.returncode == 0
+
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""
     global backend_proc, frontend_proc
@@ -55,6 +68,15 @@ def signal_handler(sig, frame):
     print_success("Servers stopped")
     sys.exit(0)
 
+def check_command_exists(command):
+    """Check if a command exists in PATH"""
+    result = subprocess.run(
+        ["which" if os.name != "nt" else "where", command],
+        capture_output=True,
+        text=True
+    )
+    return result.returncode == 0
+
 def check_arguments():
     if len(sys.argv) != 3:
         print_header("HackCamp - Restaurant Finder")
@@ -70,6 +92,56 @@ def check_arguments():
     
     return sys.argv[1], sys.argv[2]
 
+def install_nodejs():
+    """Install Node.js if not present"""
+    print_header("Installing Node.js")
+    
+    system = platform.system()
+    print_info(f"Detected OS: {system}")
+    
+    if system == "Darwin":  # macOS
+        print_info("Installing Node.js via Homebrew...")
+        try:
+            # Check if Homebrew is installed
+            result = subprocess.run(["brew", "--version"], capture_output=True)
+            if result.returncode != 0:
+                print_error("Homebrew not found. Please install from https://brew.sh")
+                return False
+            
+            subprocess.run(["brew", "install", "node"], check=True)
+            print_success("Node.js installed successfully")
+            return True
+        except subprocess.CalledProcessError:
+            print_error("Failed to install Node.js via Homebrew")
+            return False
+    
+    elif system == "Linux":
+        print_info("Installing Node.js via package manager...")
+        try:
+            # Try apt (Ubuntu/Debian)
+            subprocess.run(["sudo", "apt", "update"], check=True, capture_output=True)
+            subprocess.run(["sudo", "apt", "install", "-y", "nodejs", "npm"], check=True, capture_output=True)
+            print_success("Node.js installed successfully")
+            return True
+        except subprocess.CalledProcessError:
+            try:
+                # Try yum (RedHat/CentOS)
+                subprocess.run(["sudo", "yum", "install", "-y", "nodejs", "npm"], check=True, capture_output=True)
+                print_success("Node.js installed successfully")
+                return True
+            except subprocess.CalledProcessError:
+                print_error("Failed to install Node.js. Please install manually from https://nodejs.org")
+                return False
+    
+    elif system == "Windows":
+        print_warning("Automatic Node.js installation not supported on Windows")
+        print_info("Please download and install Node.js from https://nodejs.org/")
+        print_info("Make sure to add Node.js to PATH during installation")
+        print_info("After installation, restart this script")
+        return False
+    
+    return False
+
 def check_prerequisites():
     """Check if all required tools are installed"""
     print_header("Checking Prerequisites")
@@ -77,7 +149,7 @@ def check_prerequisites():
     issues = []
     
     # Check Python
-    print_info(f"Python version: {sys.version.split()[0]}", )
+    print_info(f"Python version: {sys.version.split()[0]}")
     if sys.version_info < (3, 8):
         issues.append("Python 3.8+ required (you have {})".format(sys.version.split()[0]))
     else:
@@ -92,10 +164,32 @@ def check_prerequisites():
         except:
             issues.append("npm found but cannot determine version")
     else:
-        issues.append("npm is NOT installed")
         print_error("npm not found ✗")
+        print_info("Attempting to install Node.js...")
+        if not install_nodejs():
+            issues.append("npm is NOT installed - please install Node.js manually")
+        else:
+            # Retry check
+            if check_command_exists("npm"):
+                try:
+                    result = subprocess.run(["npm", "--version"], capture_output=True, text=True)
+                    npm_version = result.stdout.strip()
+                    print_success(f"npm {npm_version} ✓")
+                except:
+                    issues.append("npm found but cannot verify")
+            else:
+                issues.append("npm installation failed")
     
-    # If there are issues, show instructions and exit
+    # Check git (optional but useful)
+    if check_command_exists("git"):
+        try:
+            result = subprocess.run(["git", "--version"], capture_output=True, text=True)
+            git_version = result.stdout.strip()
+            print_success(f"{git_version} ✓")
+        except:
+            pass
+    
+    # If there are critical issues, show instructions and exit
     if issues:
         print()
         print_header("Prerequisites Not Met")
@@ -165,18 +259,6 @@ FRONTEND_URL=http://localhost:3000
     except Exception as e:
         print_error(f"Error installing dependencies: {e}")
         print_info("Attempting to continue...")
-
-def check_command_exists(command):
-    """Check if a command exists in the system PATH"""
-    try:
-        subprocess.run(
-            [command, "--version"],
-            capture_output=True,
-            check=True
-        )
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
 
 def setup_frontend(script_dir, maps_key):
     print_header("Setting up Frontend")
