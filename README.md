@@ -13,23 +13,17 @@ Search for restaurants by location, budget, cuisine, dietary restrictions, and r
 
 ## Quick Start
 
-### Backend
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python3 run.py <GEMINI_API_KEY> <GOOGLE_MAPS_API_KEY>
-```
-Backend runs at `http://localhost:8000`
+Run everything with one command:
 
-### Frontend
 ```bash
-cd frontend
-npm install
-npm start
+./run.sh <GEMINI_API_KEY> <GOOGLE_MAPS_API_KEY>
 ```
-Frontend runs at `http://localhost:3000`
+
+This will automatically:
+- Set up backend virtual environment and dependencies
+- Start the FastAPI backend at `http://localhost:8000`
+- Install frontend dependencies
+- Start the React frontend at `http://localhost:3000`
 
 ## Features
 
