@@ -154,7 +154,7 @@ fi
 
 # Start frontend server
 print_info "Starting React frontend server on http://localhost:3000..."
-BROWSER=none npm start &
+BROWSER=none SKIP_PREFLIGHT_CHECK=true NODE_OPTIONS="--no-warnings --localstorage-file=/tmp/localstorage.json" npm start &
 FRONTEND_PID=$!
 print_success "Frontend server started (PID: $FRONTEND_PID)"
 

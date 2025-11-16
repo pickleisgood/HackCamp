@@ -239,11 +239,34 @@ FRONTEND_URL=http://localhost:3000
         f.write(env_content)
     print_success("Backend .env file created")
     
-    # Install requirements using system Python
+    # Create virtual environment if it doesn't exist
+    venv_dir = backend_dir / "venv"
+    if not venv_dir.exists():
+        print_info("Creating Python virtual environment...")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "venv", str(venv_dir)],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            print_success("Virtual environment created")
+        except subprocess.CalledProcessError as e:
+            print_error(f"Failed to create virtual environment: {e}")
+            sys.exit(1)
+    
+    # Determine Python executable in virtual environment
+    if platform.system() == "Windows":
+        python_executable = venv_dir / "Scripts" / "python.exe"
+    else:
+        python_executable = venv_dir / "bin" / "python"
+    
+    # Install requirements using virtual environment Python
     print_info("Installing Python dependencies...")
     try:
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", "requirements.txt", "--quiet"],
+            [str(python_executable), "-m", "pip", "install", "-r", "requirements.txt", "--quiet"],
             check=True,
             capture_output=False,
             text=True,
@@ -259,6 +282,8 @@ FRONTEND_URL=http://localhost:3000
     except Exception as e:
         print_error(f"Error installing dependencies: {e}")
         print_info("Attempting to continue...")
+    
+    return python_executable
 
 def setup_frontend(script_dir, maps_key):
     print_header("Setting up Frontend")
@@ -341,14 +366,14 @@ def main():
     check_prerequisites()
     print()
     
-    # Setup backend
-    setup_backend(str(script_dir), gemini_key, maps_key)
+    # Setup backend and get Python executable
+    python_executable = setup_backend(str(script_dir), gemini_key, maps_key)
     
     # Start backend
     print_info("Starting FastAPI backend server on http://localhost:8000...")
     backend_dir = Path(script_dir) / "backend"
     backend_proc = subprocess.Popen(
-        [sys.executable, "run.py"],
+        [str(python_executable), "run.py"],
         cwd=str(backend_dir),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -373,6 +398,8 @@ def main():
     frontend_dir = Path(script_dir) / "frontend"
     env = os.environ.copy()
     env["BROWSER"] = "none"
+    env["SKIP_PREFLIGHT_CHECK"] = "true"
+    env["NODE_OPTIONS"] = "--no-warnings --localstorage-file=/tmp/localstorage.json"
     frontend_proc = subprocess.Popen(
         ["npm", "start"],
         cwd=str(frontend_dir),
